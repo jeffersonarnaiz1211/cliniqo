@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cliniqo · Sign in</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<div class="login">
+  <aside class="login-brand">
+    <a class="logo" href="index.html" aria-label="Cliniqo">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><path d="M20 3a17 17 0 1 0 17 17h-9a8 8 0 1 1-8-8z" fill="#fff"/><circle cx="20" cy="20" r="4.5" fill="#fff"/></svg>Cliniqo
+    </a>
+    <div>
+      <h2>Clinic console</h2>
+      <p>Run the campus clinic's daily schedule, providers' hours, users and reports in one place.</p>
+    </div>
+    <small>For authorized clinic personnel only.</small>
+  </aside>
+
+  <main class="login-main">
+    <form class="login-form" id="loginForm" novalidate>
+      <a class="logo logo-lg" href="index.html" aria-label="Cliniqo">
+        <svg viewBox="0 0 40 40" aria-hidden="true"><path d="M20 3a17 17 0 1 0 17 17h-9a8 8 0 1 1-8-8z" fill="#2f3a8f"/><circle cx="20" cy="20" r="4.5" fill="#2f3a8f"/></svg>Cliniqo
+      </a>
+      <h1>Sign In</h1>
+
+      <div class="msg err" id="formMsg" role="alert" hidden></div>
+
+      <div>
+        <div class="pill-input">
+          <input id="email" name="email" type="email" placeholder="Work email" autocomplete="username" aria-label="Work email" aria-describedby="emailErr">
+        </div>
+        <p class="field-err" id="emailErr" hidden></p>
+      </div>
+
+      <div>
+        <div class="pill-input">
+          <input id="password" name="password" type="password" placeholder="Password" autocomplete="current-password" aria-label="Password" aria-describedby="pwErr">
+          <button type="button" class="eye" id="eye" aria-label="Show password" aria-pressed="false">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/><path id="slash" d="M3 3l18 18"/></svg>
+          </button>
+        </div>
+        <p class="field-err" id="pwErr" hidden></p>
+      </div>
+
+      <button type="button" class="link right" id="forgot">Forgot Password?</button>
+
+      <button type="submit" class="btn primary" id="submit">Continue</button>
+
+      <p class="foot-note">Need access? Ask the system administrator.</p>
+
+      <div class="demo">Demo accounts<br>Admin: <code>admin@ntc.edu.ph</code> / <code>Admin@123</code><br>Staff: <code>villanueva@ntc.edu.ph</code> / <code>Staff@123</code><br>Provider: <code>reyes@ntc.edu.ph</code> / <code>Provider@1</code></div>
+    </form>
+  </main>
+</div>
+<script src="js/api.js"></script>
+<script src="js/login.js"></script>
+</body>
+</html>

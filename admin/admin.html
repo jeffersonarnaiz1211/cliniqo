@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cliniqo Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <a class="logo" href="#/dashboard" aria-label="Cliniqo">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><path d="M20 3a17 17 0 1 0 17 17h-9a8 8 0 1 1-8-8z" fill="#fff"/><circle cx="20" cy="20" r="4.5" fill="#fff"/></svg>Cliniqo
+    </a>
+    <div class="tag">Admin console</div>
+    <nav id="nav" aria-label="Main">
+      <a href="#/myday" data-route="myday" hidden><i></i>My day</a>
+      <a href="#/dashboard" data-route="dashboard"><i></i>Dashboard</a>
+      <a href="#/schedule" data-route="schedule"><i></i>Daily schedule</a>
+      <a href="#/walkin" data-route="walkin"><i></i>Book for a student</a>
+      <a href="#/users" data-route="users"><i></i>Users</a>
+      <a href="#/hours" data-route="hours"><i></i>Provider hours</a>
+      <a href="#/reports" data-route="reports"><i></i>Reports</a>
+      <a href="#/audit" data-route="audit"><i></i>Audit log</a>
+    </nav>
+    <div class="me">
+      <div class="who"><b id="meName">Admin</b><br><span class="hint" id="meRole" style="color:#cfd3f7">Administrator</span></div>
+      <button type="button" id="signout">Sign out</button>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="top">
+      <div><h1 id="title"></h1><p id="subtitle"></p></div>
+      <div class="tools" id="topTools"></div>
+    </header>
+    <main class="view" id="view" aria-live="polite"></main>
+  </div>
+</div>
+
+<dialog id="dlg"></dialog>
+<script src="js/api.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
