@@ -9,19 +9,21 @@ module.exports = function (ctx) {
   const r = express.Router(), db = ctx.db;
   r.use(requireRole("admin"));
 
-  r.get("/dashboard", (req, res) => {
+  r.get("/dashboard", async (req, res) => {
     const today = T.today(), now = T.now();
-    const list = db.prepare(D.APPT_SQL + " WHERE a.date = ? ORDER BY a.time").all(today).map(D.apptDto);
+    const list = (await db.all(D.APPT_SQL + " WHERE a.date = ? ORDER BY a.time", today)).map(D.apptDto);
     const count = (s) => list.filter((a) => a.status === s).length;
-    const providers = db.prepare("SELECT * FROM users WHERE role = 'provider' AND active = 1").all();
-    const openSlots = providers.reduce((n, p) => n + D.freeTimes(db, p.id, today).length, 0);
+    const providers = await db.all("SELECT * FROM users WHERE role = 'provider' AND active = 1");
+    let openSlots = 0;
+    for (const p of providers) openSlots += (await D.freeTimes(db, p.id, today)).length;
     const overdue = list.filter((a) => a.status === "Booked" && a.time < now.time).length;
-    const noHours = providers.filter((p) => !db.prepare("SELECT 1 FROM availability WHERE provider_id = ? AND working = 1").get(p.id)).map(D.fullName);
+    const noHours = [];
+    for (const p of providers) if (!(await db.get("SELECT 1 FROM availability WHERE provider_id = ? AND working = 1", p.id))) noHours.push(D.fullName(p));
     res.json({
       date: today,
       total: list.filter((a) => a.status !== "Cancelled").length, checkedIn: count("Checked in"), cancelled: count("Cancelled"), openSlots,
       next: list.filter((a) => a.status === "Booked" || a.status === "Checked in").slice(0, 5),
-      attention: { overdue, providersWithoutHours: noHours, disabledAccounts: db.prepare("SELECT COUNT(*) c FROM users WHERE active = 0").get().c }
+      attention: { overdue, providersWithoutHours: noHours, disabledAccounts: (await db.get("SELECT COUNT(*)::int c FROM users WHERE active = 0")).c }
     });
   });
 
@@ -32,9 +34,9 @@ module.exports = function (ctx) {
     return { days, from: T.addDays(to, -(days - 1)), to };
   }
 
-  r.get("/reports", (req, res) => {
+  r.get("/reports", async (req, res) => {
     const { days, from, to } = range(req);
-    const rows = db.prepare(D.APPT_SQL + " WHERE a.date BETWEEN ? AND ?").all(from, to).map(D.apptDto);
+    const rows = (await db.all(D.APPT_SQL + " WHERE a.date BETWEEN ? AND ?", from, to)).map(D.apptDto);
     const c = (s) => rows.filter((a) => a.status === s).length;
     const total = rows.length, done = c("Completed"), ns = c("No-show"), cx = c("Cancelled");
     const perDay = [];
@@ -48,19 +50,19 @@ module.exports = function (ctx) {
     });
   });
 
-  r.get("/reports.csv", (req, res) => {
+  r.get("/reports.csv", async (req, res) => {
     const { from, to } = range(req);
-    const rows = db.prepare(D.APPT_SQL + " WHERE a.date BETWEEN ? AND ? ORDER BY a.date, a.time").all(from, to).map(D.apptDto);
+    const rows = (await db.all(D.APPT_SQL + " WHERE a.date BETWEEN ? AND ? ORDER BY a.date, a.time", from, to)).map(D.apptDto);
     // A leading = + - @ can make spreadsheets run text as a formula, so those cells get a leading apostrophe.
     const cell = (v) => { v = String(v == null ? "" : v); if (/^[=+\-@]/.test(v)) v = "'" + v; return '"' + v.replace(/"/g, '""') + '"'; };
     const lines = [["Date", "Time", "Student", "Student number", "Provider", "Department", "Status", "Reason"].join(",")]
       .concat(rows.map((a) => [a.date, a.time, a.student.name, a.student.studentNumber, a.provider.name, a.provider.department, a.status, a.cancelReason].map(cell).join(",")));
-    D.audit(db, req.user, "Exported CSV", from + " to " + to);
+    await D.audit(db, req.user, "Exported CSV", from + " to " + to);
     res.set({ "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": 'attachment; filename="cliniqo-appointments-' + from + "-to-" + to + '.csv"' }).send(lines.join("\r\n"));
   });
 
-  r.get("/audit", (req, res) => {
-    const rows = db.prepare("SELECT * FROM audit_log ORDER BY id DESC LIMIT 60").all();
+  r.get("/audit", async (req, res) => {
+    const rows = await db.all("SELECT * FROM audit_log ORDER BY id DESC LIMIT 60");
     res.json({ entries: rows.map((l) => ({ id: l.id, at: l.at.replace(" ", "T") + "Z", by: l.user_name, action: l.action, target: l.target })) });
   });
   return r;

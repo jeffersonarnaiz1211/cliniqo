@@ -13,12 +13,12 @@ const clearSession = (res, ctx) => res.clearCookie(COOKIE, { httpOnly: true, sam
 
 /* The role is always read from the database, never from the token or the browser. */
 function authenticate(ctx) {
-  return (req, res, next) => {
+  return async (req, res, next) => {
     const token = req.cookies && req.cookies[COOKIE];
     if (!token) throw new HttpError(401, "Please sign in.");
     let payload;
     try { payload = jwt.verify(token, ctx.jwtSecret); } catch (e) { throw new HttpError(401, "Your session has ended. Please sign in again."); }
-    const user = ctx.db.prepare("SELECT * FROM users WHERE id = ?").get(payload.sub);
+    const user = await ctx.db.get("SELECT * FROM users WHERE id = ?", payload.sub);
     if (!user || !user.active) throw new HttpError(401, "Your session has ended. Please sign in again.");
     req.user = user;
     next();

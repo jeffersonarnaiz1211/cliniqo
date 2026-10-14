@@ -13,12 +13,21 @@ if (!secret) {
   console.warn("[config] JWT_SECRET is not set. Using a temporary secret, so everyone is signed out when the server restarts.");
 }
 
+function dbTarget() {
+  if (env.DATABASE_URL) return env.DATABASE_URL.trim();
+  if (prod) throw new Error("DATABASE_URL must be set when NODE_ENV=production (use your Supabase connection string).");
+  return "pglite:" + path.join(__dirname, "..", "data", "pgdata");
+}
+
 module.exports = {
   prod,
   port: Number(env.PORT) || 3000,
   jwtSecret: secret,
-  dbPath: env.DB_PATH || path.join(__dirname, "..", "data", "cliniqo.db"),
+  // Supabase (or any PostgreSQL) connection string. Required in production.
+  // Without it, local development uses a PostgreSQL database stored in the data/ folder.
+  dbTarget: dbTarget(),
+  seedDemo: env.SEED_DEMO === "true",
   clinicTz: env.CLINIC_TZ || "Asia/Manila",
   secureCookie: env.COOKIE_SECURE ? env.COOKIE_SECURE === "true" : prod,
-  trustProxy: env.TRUST_PROXY === "1"
+  trustProxy: env.TRUST_PROXY === "true" || env.TRUST_PROXY === "1"
 };

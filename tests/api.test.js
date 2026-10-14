@@ -13,13 +13,13 @@ let server, base, db;
 T.configure({ tz: "Asia/Manila", now: () => new Date("2026-10-12T02:00:00Z") }); // 10:00 in Manila
 const TODAY = "2026-10-12";
 
-before(() => {
-  db = openDb(":memory:");
-  seed(db);
+before(async () => {
+  db = await openDb(":memory:"); // PostgreSQL running inside Node (PGlite), so no database server is needed
+  await seed(db);
   const app = createApp({ db, jwtSecret: "test-secret", rateLimit: false });
   return new Promise((resolve) => { server = app.listen(0, () => { base = "http://127.0.0.1:" + server.address().port; resolve(); }); });
 });
-after(() => { server.close(); db.close(); });
+after(async () => { server.close(); await db.close(); });
 
 function client() {
   let cookie = "";
@@ -55,9 +55,9 @@ async function freeSlot(c, date, deptId = 1, skip = 0) {
   return r.json.slots[skip];
 }
 // Pretend a booking was made `minutes` ago (the test clock is fixed, so we edit created_at).
-function ageBooking(id, minutes) {
+async function ageBooking(id, minutes) {
   const stamp = new Date(T.nowMs() - minutes * 60000).toISOString().slice(0, 19).replace("T", " ");
-  db.prepare("UPDATE appointments SET created_at = ? WHERE id = ?").run(stamp, id);
+  await db.run("UPDATE appointments SET created_at = ? WHERE id = ?", stamp, id);
 }
 async function laterToday(c) {
   for (const dept of [2, 1]) { const r = await c.get("/api/slots?departmentId=" + dept + "&date=" + TODAY); const s = r.json.slots.find((x) => x.time > "10:00"); if (s) return s; }
@@ -110,8 +110,8 @@ test("API-09 registering an existing student number is rejected", async () => {
   const r = await client().post("/api/auth/register", { firstName: "Maria", lastName: "Santos", studentNumber: "2024-00118", password: "Passw0rd1", confirmPassword: "Passw0rd1" });
   assert.equal(r.status, 409);
 });
-test("API-10 passwords are stored as hashes", () => {
-  const row = db.prepare("SELECT password_hash FROM users WHERE login = 'admin@ntc.edu.ph'").get();
+test("API-10 passwords are stored as hashes", async () => {
+  const row = await db.get("SELECT password_hash FROM users WHERE login = 'admin@ntc.edu.ph'");
   assert.match(row.password_hash, /^\$2[aby]\$/); assert.notEqual(row.password_hash, "Admin@123");
 });
 test("API-11 requests without the CSRF header are blocked", async () => {
@@ -144,7 +144,7 @@ test("API-16 provider sees only their own appointments", async () => {
   assert.ok(r.json.appointments.every((a) => a.provider.name === "Dr. Reyes"));
 });
 test("API-17 provider cannot change another provider's hours", async () => {
-  const p = await reyes(); const cruzId = db.prepare("SELECT id FROM users WHERE login = 'cruz@ntc.edu.ph'").get().id;
+  const p = await reyes(); const cruzId = (await db.get("SELECT id FROM users WHERE login = 'cruz@ntc.edu.ph'")).id;
   assert.equal((await p.get("/api/providers/" + cruzId + "/availability")).status, 403);
   assert.equal((await p.put("/api/providers/" + cruzId + "/availability", { hours: [] })).status, 403);
 });
@@ -162,9 +162,9 @@ test("API-19 booking a taken slot is rejected (conflict prevention)", async () =
   assert.equal((await book(a, slot, date)).status, 201);
   const r = await book(b, slot, date); assert.equal(r.status, 409);
 });
-test("API-20 the database itself blocks a double booking", () => {
-  const row = db.prepare("SELECT provider_id, date, time, student_id FROM appointments WHERE status <> 'Cancelled' LIMIT 1").get();
-  assert.throws(() => db.prepare("INSERT INTO appointments (student_id, provider_id, date, time, created_by) VALUES (?,?,?,?,1)").run(row.student_id + 100, row.provider_id, row.date, row.time), /UNIQUE/);
+test("API-20 the database itself blocks a double booking", async () => {
+  const row = await db.get("SELECT provider_id, date, time, student_id FROM appointments WHERE status <> 'Cancelled' LIMIT 1");
+  await assert.rejects(db.run("INSERT INTO appointments (student_id, provider_id, date, time, created_by) VALUES (?,?,?,?,1)", row.student_id + 100, row.provider_id, row.date, row.time), (e) => e.code === "23505"); // 23505 = unique violation
 });
 test("API-21 booking in the past, too far ahead, or at an invalid time is rejected", async () => {
   const s = await newStudent(); const slot = await freeSlot(s, "2026-10-16");
@@ -217,7 +217,7 @@ test("API-28 student cannot cancel inside the 24-hour cutoff", async () => {
   const st = await staff(), s = await newStudent();
   const slot = await laterToday(st);
   const id = (await st.post("/api/appointments", { studentNumber: s.num, providerId: slot.providerId, date: TODAY, time: slot.time })).json.appointment.id;
-  ageBooking(id, 180); // booked 3 hours ago, so the new-booking grace period is over
+  await ageBooking(id, 180); // booked 3 hours ago, so the new-booking grace period is over
   const r = await s.post("/api/appointments/" + id + "/cancel", {}); assert.equal(r.status, 403); assert.match(r.json.error, /24 hours/);
   const rs = await s.post("/api/appointments/" + id + "/reschedule", { date: "2026-10-23", time: "09:00" }); assert.equal(rs.status, 403);
   assert.equal((await st.post("/api/appointments/" + id + "/cancel", { reason: "Student called" })).status, 403);
@@ -236,10 +236,10 @@ test("API-28a new booking inside 24 hours can be cancelled within 2 hours of boo
 test("API-28b the 2-hour grace period ends, and staff can use it for a booking they just made", async () => {
   const st = await staff(), s = await newStudent(); const slot = await laterToday(st);
   const id = (await st.post("/api/appointments", { studentNumber: s.num, providerId: slot.providerId, date: TODAY, time: slot.time })).json.appointment.id;
-  ageBooking(id, 119); assert.equal((await s.get("/api/appointments/mine")).json.upcoming[0].graceMinutesLeft, 1);
-  ageBooking(id, 121); assert.equal((await s.get("/api/appointments/mine")).json.upcoming[0].graceMinutesLeft, 0);
+  await ageBooking(id, 119); assert.equal((await s.get("/api/appointments/mine")).json.upcoming[0].graceMinutesLeft, 1);
+  await ageBooking(id, 121); assert.equal((await s.get("/api/appointments/mine")).json.upcoming[0].graceMinutesLeft, 0);
   assert.equal((await s.post("/api/appointments/" + id + "/cancel", {})).status, 403);
-  ageBooking(id, 30);
+  await ageBooking(id, 30);
   assert.equal((await st.post("/api/appointments/" + id + "/cancel", {})).status, 400, "staff still must give a reason");
   assert.equal((await st.post("/api/appointments/" + id + "/cancel", { reason: "Booked wrong student" })).status, 200);
 });
@@ -265,7 +265,7 @@ test("API-31 mine splits upcoming and past appointments", async () => {
 /* ---------------- Status changes ---------------- */
 test("API-32 staff checks in, provider completes, and invalid changes are refused", async () => {
   const st = await staff(), pr = await reyes(); const stu = await newStudent();
-  const slot = (await st.get("/api/slots?providerId=" + db.prepare("SELECT id FROM users WHERE login='reyes@ntc.edu.ph'").get().id + "&date=2026-10-27")).json.slots[0];
+  const slot = (await st.get("/api/slots?providerId=" + (await db.get("SELECT id FROM users WHERE login='reyes@ntc.edu.ph'")).id + "&date=2026-10-27")).json.slots[0];
   const id = (await st.post("/api/appointments", { studentNumber: stu.num, providerId: slot.providerId, date: "2026-10-27", time: slot.time })).json.appointment.id;
   assert.equal((await pr.post("/api/appointments/" + id + "/status", { status: "Checked in" })).status, 403);
   assert.equal((await st.post("/api/appointments/" + id + "/status", { status: "Checked in" })).status, 200);
@@ -276,7 +276,7 @@ test("API-32 staff checks in, provider completes, and invalid changes are refuse
 });
 test("API-33 a provider cannot update another provider's appointment", async () => {
   const st = await staff(), cz = await cruz(), stu = await newStudent();
-  const rid = db.prepare("SELECT id FROM users WHERE login='reyes@ntc.edu.ph'").get().id;
+  const rid = (await db.get("SELECT id FROM users WHERE login='reyes@ntc.edu.ph'")).id;
   const slot = (await st.get("/api/slots?providerId=" + rid + "&date=2026-10-28")).json.slots[0];
   const id = (await st.post("/api/appointments", { studentNumber: stu.num, providerId: rid, date: "2026-10-28", time: slot.time })).json.appointment.id;
   assert.equal((await cz.post("/api/appointments/" + id + "/status", { status: "Completed" })).status, 404);
@@ -297,7 +297,7 @@ test("API-35 admin creates a provider, with validation and duplicate checks", as
   const a = await admin();
   const ok = await a.post("/api/users", { role: "provider", firstName: "Dr.", lastName: "Tester", login: "tester@ntc.edu.ph", password: "Passw0rd1", departmentId: 1 });
   assert.equal(ok.status, 201);
-  assert.equal(db.prepare("SELECT COUNT(*) c FROM availability WHERE provider_id = ?").get(ok.json.user.id).c, 7);
+  assert.equal((await db.get("SELECT COUNT(*)::int c FROM availability WHERE provider_id = ?", ok.json.user.id)).c, 7);
   assert.equal((await a.post("/api/users", { role: "provider", firstName: "Dr.", lastName: "Tester", login: "tester@ntc.edu.ph", password: "Passw0rd1", departmentId: 1 })).status, 409);
   assert.equal((await a.post("/api/users", { role: "staff", firstName: "No", lastName: "Email", login: "nope", password: "Passw0rd1" })).status, 400);
   assert.equal((await a.post("/api/users", { role: "student", firstName: "Bad", lastName: "Number", login: "x@y.z", password: "Passw0rd1" })).status, 400);
@@ -319,7 +319,7 @@ test("API-37 admin resets a password", async () => {
   assert.equal((await client().post("/api/auth/login", { login: s.num, password: "NewPassw0rd" })).status, 200);
 });
 test("API-38 hours: invalid times are rejected and valid hours change the slots", async () => {
-  const a = await admin(); const rid = db.prepare("SELECT id FROM users WHERE login='reyes@ntc.edu.ph'").get().id;
+  const a = await admin(); const rid = (await db.get("SELECT id FROM users WHERE login='reyes@ntc.edu.ph'")).id;
   const cur = (await a.get("/api/providers/" + rid + "/availability")).json.hours;
   const bad1 = cur.map((h) => (h.weekday === 0 ? { ...h, working: true, start: "12:00", end: "09:00" } : h));
   assert.equal((await a.put("/api/providers/" + rid + "/availability", { hours: bad1 })).status, 400);
@@ -331,7 +331,7 @@ test("API-38 hours: invalid times are rejected and valid hours change the slots"
   assert.equal((await a.put("/api/providers/" + rid + "/availability", { hours: cur })).status, 200);
 });
 test("API-39 blocked dates remove slots and cannot be duplicated", async () => {
-  const pr = await reyes(); const rid = db.prepare("SELECT id FROM users WHERE login='reyes@ntc.edu.ph'").get().id;
+  const pr = await reyes(); const rid = (await db.get("SELECT id FROM users WHERE login='reyes@ntc.edu.ph'")).id;
   assert.equal((await pr.post("/api/providers/" + rid + "/blocked", { date: "2026-11-02", reason: "Training" })).status, 201);
   assert.equal((await pr.post("/api/providers/" + rid + "/blocked", { date: "2026-11-02", reason: "Again" })).status, 409);
   assert.equal((await pr.post("/api/providers/" + rid + "/blocked", { date: "2026-10-01", reason: "Past" })).status, 400);

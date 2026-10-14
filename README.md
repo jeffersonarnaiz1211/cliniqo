@@ -8,15 +8,15 @@ One Node.js server that provides:
 | `/admin` | Clinic console website | Admin, Clinic Staff, Provider |
 | `/api` | REST API | Both front ends |
 
-**Stack:** Node 22, Express, SQLite (better-sqlite3), bcrypt password hashes, JWT in an HttpOnly cookie, plain HTML/CSS/JS front ends.
+**Stack:** Node 22, Express, PostgreSQL on Supabase (`pg` driver), bcrypt password hashes, JWT in an HttpOnly cookie, plain HTML/CSS/JS front ends.
 
 ## Run it
 
 ```bash
 npm install
-npm start          # http://localhost:3000  (auto-seeds demo data on first run)
+npm start          # http://localhost:3000  (local database in data/, auto-seeds demo data on first run)
 npm test           # 44 automated API tests
-npm run seed       # reset demo data (deletes existing data)
+npm run seed       # create demo data in an empty database
 ```
 
 Copy `.env.example` to `.env` for production settings. School email domain used in demo data: `ntc.edu.ph`.
@@ -51,7 +51,24 @@ Change or delete these before any real use.
 
 1. Phone and computer on the same Wi-Fi. Find the computer's IP (e.g. `192.168.1.20`) and run `npm start`.
 2. Open `http://192.168.1.20:3000/app` on the phone, then "Add to Home Screen".
-3. Full install and the offline shell need HTTPS, so deploy to a host (Render, Railway, Fly.io) and set `COOKIE_SECURE=true`, `TRUST_PROXY=true`, `JWT_SECRET`, and a persistent disk for `DB_PATH`.
+3. Full install and the offline shell need HTTPS, so deploy it (see "Deploy with Supabase and Render" below).
+
+## Deploy with Supabase and Render
+
+**Database (Supabase)**
+1. Create a project at supabase.com and save the database password.
+2. Click **Connect** at the top of the dashboard and copy the **Session pooler** connection string (Render needs the pooler because it cannot reach Supabase's direct address over IPv6).
+3. Put your password in place of `[YOUR-PASSWORD]`. If it has special characters, URL-encode them.
+
+The app creates its own tables on first start and turns on Row Level Security so the public Supabase API key cannot read them.
+
+**Web service (Render)**
+1. Push this repo to GitHub. Render > **New > Web Service** > pick the repo.
+2. Build command `npm install`, start command `npm start`, instance type Free.
+3. Environment variables: `NODE_ENV=production`, `DATABASE_URL` (the string from above), `JWT_SECRET` (long random text), `TRUST_PROXY=true`, `COOKIE_SECURE=true`, `CLINIC_TZ=Asia/Manila`, and `SEED_DEMO=true` for the first deploy only.
+4. After the first successful start, delete `SEED_DEMO` (or set it to `false`), sign in as admin, and change the demo passwords.
+
+To seed from your own computer instead, put `DATABASE_URL` in `.env` and run `npm run seed` once.
 
 ## Known limitations (state these in your report)
 
@@ -59,7 +76,7 @@ Change or delete these before any real use.
 - Reminders are in-app only (no SMS/email/push).
 - No password-reset email; an admin resets passwords.
 - No Google sign-in.
-- SQLite on one server: fine for a campus MVP, not for large scale.
+- Free hosting tiers: Render's free web service sleeps when idle (the first request is slow), and a free Supabase project pauses after a week without activity.
 
 ## Layout
 
