@@ -1,7 +1,7 @@
 /* Caches the app shell so it opens fast and shows a friendly offline message.
    API calls are never cached: appointment data must always be live. */
-var CACHE = "cliniqo-shell-v1";
-var SHELL = ["./", "css/app.css", "js/app.js", "manifest.json", "icons/icon.svg"];
+var CACHE = "cliniqo-shell-v2";
+var SHELL = ["./", "css/app.css", "js/app.js", "js/pwtoggle.js", "manifest.json", "icons/icon.svg"];
 self.addEventListener("install", function (e) { e.waitUntil(caches.open(CACHE).then(function (c) { return c.addAll(SHELL); }).then(function () { return self.skipWaiting(); })); });
 self.addEventListener("activate", function (e) {
   e.waitUntil(caches.keys().then(function (ks) { return Promise.all(ks.filter(function (k) { return k !== CACHE; }).map(function (k) { return caches.delete(k); })); }).then(function () { return self.clients.claim(); }));

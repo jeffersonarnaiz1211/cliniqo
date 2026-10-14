@@ -159,3 +159,10 @@ dialog .btns{display:flex;justify-content:flex-end;gap:10px}
 .slot:disabled{border-color:var(--line);background:var(--mute-bg);color:#a2a4b4;text-decoration:line-through;cursor:not-allowed}
 .in[readonly]{background:#fff;color:var(--text)}
 .in[aria-invalid="true"]{border-color:#d33a3f;color:var(--bad-fg)}
+/* Show-password button (added by js/pwtoggle.js) */
+.pw-wrap{position:relative;display:block}
+.pw-wrap>input{padding-right:44px}
+.pw-eye{position:absolute;right:5px;top:50%;transform:translateY(-50%);width:32px;height:32px;padding:0;border:0;background:transparent;border-radius:50%;cursor:pointer;color:#6b6f85;display:grid;place-items:center}
+.pw-eye:hover{color:var(--text)}
+.pw-eye svg{width:19px;height:19px}
+.pw-eye[aria-pressed="true"] .slash{display:none}
